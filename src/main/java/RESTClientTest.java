@@ -1,5 +1,7 @@
-import com.amazonaws.auth.AWS4Signer;
-import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
+import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
+import software.amazon.awssdk.auth.signer.Aws4Signer;
+import software.amazon.awssdk.regions.Region;
+
 import com.amazonaws.http.AWSRequestSigningApacheInterceptor;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpRequestInterceptor;
@@ -25,11 +27,11 @@ import java.util.HashMap;
 public class RESTClientTest {
 
     private static String host = "https://search-dblock-test-opensearch-21-tu5gqrjd4vg4qazjsu6bps5zsy.us-west-2.es.amazonaws.com"; // put your own end-point
-    private static String serviceName = "es";
-    private static String region = "us-west-2";
+    private static String service = "es";
+    private static Region region = Region.US_WEST_2;
 
     public static void main(String[] args) throws IOException {
-        RestHighLevelClient searchClient = searchClient(serviceName, region);
+        RestHighLevelClient searchClient = searchClient(service, region);
 
         try {
             RequestOptions.Builder requestOptions = RequestOptions.DEFAULT.toBuilder();
@@ -92,12 +94,9 @@ public class RESTClientTest {
     }
 
     // Adds the interceptor to the OpenSearch REST client
-    public static RestHighLevelClient searchClient(String serviceName, String region) {
-        AWS4Signer signer = new AWS4Signer();
-        signer.setServiceName(serviceName);
-        signer.setRegionName(region);
+    public static RestHighLevelClient searchClient(String service, Region region) {
+        HttpRequestInterceptor interceptor = new AWSRequestSigningApacheInterceptor(service, region);
 
-        HttpRequestInterceptor interceptor = new AWSRequestSigningApacheInterceptor(serviceName, signer, new DefaultAWSCredentialsProviderChain());
         RestHighLevelClient restHighLevelClient = new RestHighLevelClient(RestClient.builder(HttpHost.create(host))
                 .setHttpClientConfigCallback(hacb -> hacb.addInterceptorLast(interceptor))
                 .setCompressionEnabled(true));

@@ -12,9 +12,22 @@
  */
 package com.amazonaws.http;
 
-import com.amazonaws.DefaultRequest;
-import com.amazonaws.auth.AWSCredentialsProvider;
-import com.amazonaws.auth.Signer;
+import software.amazon.awssdk.auth.credentials.AwsCredentials;
+import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
+import software.amazon.awssdk.auth.signer.Aws4Signer;
+import software.amazon.awssdk.auth.signer.AwsSignerExecutionAttribute;
+import software.amazon.awssdk.auth.signer.params.Aws4SignerParams;
+import software.amazon.awssdk.core.async.AsyncRequestBody;
+import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
+import software.amazon.awssdk.core.interceptor.ExecutionAttributes;
+import software.amazon.awssdk.http.HttpExecuteRequest;
+import software.amazon.awssdk.http.HttpExecuteResponse;
+import software.amazon.awssdk.http.SdkHttpClient;
+import software.amazon.awssdk.http.SdkHttpFullRequest;
+import software.amazon.awssdk.http.SdkHttpMethod;
+import software.amazon.awssdk.regions.Region;
+
 import org.apache.http.Header;
 import org.apache.http.HttpEntityEnclosingRequest;
 import org.apache.http.HttpException;
@@ -22,17 +35,25 @@ import org.apache.http.HttpHost;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpRequestInterceptor;
 import org.apache.http.NameValuePair;
+import org.apache.http.client.entity.DeflateDecompressingEntity;
 import org.apache.http.client.entity.GzipDecompressingEntity;
 import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.entity.BasicHttpEntity;
+import org.apache.http.impl.DefaultHttpRequestFactory;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.protocol.HttpContext;
 import org.apache.http.util.EntityUtils;
+import software.amazon.awssdk.http.ContentStreamProvider;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -52,35 +73,38 @@ public class AWSRequestSigningApacheInterceptor implements HttpRequestIntercepto
      */
     private final String service;
 
+    private final Region region;
+
     /**
      * The particular signer implementation.
      */
-    private final Signer signer;
+    private final Aws4Signer signer;
 
     /**
      * The source of AWS credentials for signing.
      */
-    private final AWSCredentialsProvider awsCredentialsProvider;
+    private final AwsCredentialsProvider awsCredentialsProvider;
 
     /**
      * @param service                service that we're connecting to
-     * @param signer                 particular signer implementation
-     * @param awsCredentialsProvider source of AWS credentials for signing
+     * @param region                 region
      */
-    public AWSRequestSigningApacheInterceptor(final String service,
-                                              final Signer signer,
-                                              final AWSCredentialsProvider awsCredentialsProvider) {
+    public AWSRequestSigningApacheInterceptor(
+        final String service,
+        final Region region) {
         this.service = service;
-        this.signer = signer;
-        this.awsCredentialsProvider = awsCredentialsProvider;
+        this.region = region;
+
+        this.signer = Aws4Signer.create();
+        this.awsCredentialsProvider = DefaultCredentialsProvider.create();
     }
 
     /**
      * {@inheritDoc}
      */
     @Override
-    public void process(final HttpRequest request, final HttpContext context)
-            throws HttpException, IOException {
+    public void process(final HttpRequest request, final HttpContext context) throws HttpException, IOException {
+
         URIBuilder uriBuilder;
         try {
             uriBuilder = new URIBuilder(request.getRequestLine().getUri());
@@ -88,67 +112,89 @@ public class AWSRequestSigningApacheInterceptor implements HttpRequestIntercepto
             throw new IOException("Invalid URI", e);
         }
 
-        // Copy Apache HttpRequest to AWS DefaultRequest
-        DefaultRequest<?> signableRequest = new DefaultRequest<>(service);
-
         HttpHost host = (HttpHost) context.getAttribute(HTTP_TARGET_HOST);
-        if (host != null) {
-            signableRequest.setEndpoint(URI.create(host.toURI()));
-        }
-        final HttpMethodName httpMethod = HttpMethodName.fromValue(request.getRequestLine().getMethod());
-        signableRequest.setHttpMethod(httpMethod);
-        try {
-            signableRequest.setResourcePath(uriBuilder.build().getRawPath());
-        } catch (URISyntaxException e) {
-            throw new IOException("Invalid URI", e);
-        }
+
+        System.out.println("\n" + request.getRequestLine().getMethod() + " " + host.toString() + uriBuilder.toString());
+
+        SdkHttpFullRequest.Builder httpRequestBuilder = SdkHttpFullRequest.builder().protocol(host.getSchemeName());
+        httpRequestBuilder = httpRequestBuilder.host(host.getHostName());
+        httpRequestBuilder = httpRequestBuilder.port(host.getPort());
+        httpRequestBuilder = httpRequestBuilder.method(SdkHttpMethod.fromValue(request.getRequestLine().getMethod()));
+        httpRequestBuilder = httpRequestBuilder.encodedPath(uriBuilder.getPath());
+        httpRequestBuilder = httpRequestBuilder.rawQueryParameters(nvpToMapParams(uriBuilder.getQueryParams()));
 
         long contentLength = -1L;
         if (request instanceof HttpEntityEnclosingRequest) {
-            HttpEntityEnclosingRequest httpEntityEnclosingRequest =
-                    (HttpEntityEnclosingRequest) request;
+            HttpEntityEnclosingRequest httpEntityEnclosingRequest = (HttpEntityEnclosingRequest) request;
             if (httpEntityEnclosingRequest.getEntity() != null) {
-
                 Header contentEncodingHeader = httpEntityEnclosingRequest.getFirstHeader("Content-Encoding");
                 if (contentEncodingHeader != null && contentEncodingHeader.getValue() == "gzip") {
                     GzipDecompressingEntity decompressedEntity = new GzipDecompressingEntity(httpEntityEnclosingRequest.getEntity());
-                    contentLength = EntityUtils.toString(decompressedEntity).length();
-                    System.out.println(EntityUtils.toString(decompressedEntity));
-                    // signableRequest.setContent(new ByteArrayInputStream(EntityUtils.toString(decompressedEntity).getBytes()));
+                    String decompressedData = EntityUtils.toString(decompressedEntity);
+                    System.out.println(decompressedData);
+                    byte[] content = decompressedData.getBytes();
+                    contentLength = content.length;
+                    ContentStreamProvider syncBody = () -> new ByteArrayInputStream(content);
+                    httpRequestBuilder = httpRequestBuilder.contentStreamProvider(syncBody);
+                } else {
+                    InputStream dataStream = httpEntityEnclosingRequest.getEntity().getContent();
+                    byte[] content = dataStream.readAllBytes();
+                    System.out.println(new String(content));
+                    ContentStreamProvider syncBody = () -> new ByteArrayInputStream(content);
+                    httpRequestBuilder = httpRequestBuilder.contentStreamProvider(syncBody);
                 }
-
-                signableRequest.setContent(httpEntityEnclosingRequest.getEntity().getContent());
             }
         }
-        signableRequest.setParameters(nvpToMapParams(uriBuilder.getQueryParams()));
+        
         List<Header> headers = new ArrayList<>();
         headers.addAll(Arrays.asList(request.getAllHeaders()));
 
         if (contentLength > 0) {
-            headers.add(new BasicHeader("x-amz-decoded-content-length", Long.toString(contentLength)));
+            headers.add(new BasicHeader("x-Amz-Decoded-Content-Length", Long.toString(contentLength)));
         }
 
-        // headers.add(new BasicHeader("x-amz-content-sha256", "STREAMING-AWS4-HMAC-SHA256-PAYLOAD"));
-        signableRequest.setHeaders(headerArrayToMap(headers));
-
         // Sign it
-        signer.sign(signableRequest, awsCredentialsProvider.getCredentials());
+        Aws4SignerParams signerParams = Aws4SignerParams.builder()
+                .awsCredentials(this.awsCredentialsProvider.resolveCredentials())
+                .signingName(this.service)
+                .signingRegion(this.region)
+                .build();
+
+        httpRequestBuilder = httpRequestBuilder.headers(headerArrayToMap(headers));
+        
+        SdkHttpFullRequest signableRequest = httpRequestBuilder.build();
+        
+        signableRequest = signer.sign(signableRequest, signerParams);
 
         // Now copy everything back
-        request.setHeaders(mapToHeaderArray(signableRequest.getHeaders()));
-        if (request instanceof HttpEntityEnclosingRequest) {
-            HttpEntityEnclosingRequest httpEntityEnclosingRequest =
-                    (HttpEntityEnclosingRequest) request;
+        request.setHeaders(mapToHeaderArray(signableRequest.headers()));
+
+        if (request instanceof HttpEntityEnclosingRequest) { 
+            HttpEntityEnclosingRequest httpEntityEnclosingRequest = (HttpEntityEnclosingRequest) request;
             if (httpEntityEnclosingRequest.getEntity() != null) {
-                BasicHttpEntity basicHttpEntity = new BasicHttpEntity();
-                basicHttpEntity.setContent(signableRequest.getContent());
-                httpEntityEnclosingRequest.setEntity(basicHttpEntity);
+                // BasicHttpEntity basicHttpEntity = new BasicHttpEntity();
+                // basicHttpEntity.setContent(signableRequest.contentStreamProvider());
+                // httpEntityEnclosingRequest.setEntity(basicHttpEntity);
             }
         }
 
         for(Header header : request.getAllHeaders()) {
             System.out.println(header.getName() + ": " + header.getValue());
         }
+    }
+
+    /**
+     * @param headers modeled Header objects
+     * @return a Map of header entries
+     */
+    private static Map<String, List<String>> headerArrayToMap(List<Header> headers) {
+        Map<String, List<String>> headersMap = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        for (Header header : headers) {
+            List<String> values = new ArrayList<String>();
+            values.add(header.getValue());
+            headersMap.put(header.getName(), values);
+        }
+        return headersMap;
     }
 
     /**
@@ -166,28 +212,16 @@ public class AWSRequestSigningApacheInterceptor implements HttpRequestIntercepto
     }
 
     /**
-     * @param headers modeled Header objects
-     * @return a Map of header entries
-     */
-    private static Map<String, String> headerArrayToMap(List<Header> headers) {
-        Map<String, String> headersMap = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
-        for (Header header : headers) {
-            headersMap.put(header.getName(), header.getValue());
-        }
-//        headersMap.put("Content-Length", "44");
-        return headersMap;
-    }
-
-    /**
      * @param mapHeaders Map of header entries
      * @return modeled Header objects
      */
-    private static Header[] mapToHeaderArray(final Map<String, String> mapHeaders) {
-        Header[] headers = new Header[mapHeaders.size()];
-        int i = 0;
-        for (Map.Entry<String, String> headerEntry : mapHeaders.entrySet()) {
-            headers[i++] = new BasicHeader(headerEntry.getKey(), headerEntry.getValue());
+    private static Header[] mapToHeaderArray(final Map<String, List<String>> mapHeaders) {
+        List<Header> headers = new ArrayList<Header>();
+        for (Map.Entry<String, List<String>> headerEntry : mapHeaders.entrySet()) {
+            for(String headerValue : headerEntry.getValue()) {
+                headers.add(new BasicHeader(headerEntry.getKey(), headerValue));
+            }
         }
-        return headers;
+        return headers.toArray(new Header[0]);
     }
 }
