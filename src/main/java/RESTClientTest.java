@@ -1,8 +1,6 @@
-import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
-import software.amazon.awssdk.auth.signer.Aws4Signer;
-import software.amazon.awssdk.regions.Region;
+import java.io.IOException;
+import java.util.HashMap;
 
-import com.amazonaws.http.AWSRequestSigningApacheInterceptor;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpRequestInterceptor;
 import org.opensearch.action.admin.indices.delete.DeleteIndexRequest;
@@ -20,8 +18,9 @@ import org.opensearch.client.indices.CreateIndexRequest;
 import org.opensearch.client.indices.CreateIndexResponse;
 import org.opensearch.common.settings.Settings;
 
-import java.io.IOException;
-import java.util.HashMap;
+import com.amazonaws.http.AWSRequestSigningApacheInterceptor;
+
+import software.amazon.awssdk.regions.Region;
 
 
 public class RESTClientTest {
