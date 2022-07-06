@@ -18,14 +18,18 @@ import org.opensearch.client.indices.CreateIndexRequest;
 import org.opensearch.client.indices.CreateIndexResponse;
 import org.opensearch.common.settings.Settings;
 
-import com.amazonaws.http.AWSRequestSigningApacheInterceptor;
+import com.amazonaws.http.AwsRequestSigningApacheInterceptor;
 
+import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
+import software.amazon.awssdk.auth.signer.Aws4Signer;
 import software.amazon.awssdk.regions.Region;
-
 
 public class RESTClientTest {
 
-    private static String host = "https://search-dblock-test-opensearch-21-tu5gqrjd4vg4qazjsu6bps5zsy.us-west-2.es.amazonaws.com"; // put your own end-point
+    private static String host = "https://search-dblock-test-opensearch-21-tu5gqrjd4vg4qazjsu6bps5zsy.us-west-2.es.amazonaws.com"; // put
+                                                                                                                                   // your
+                                                                                                                                   // own
+                                                                                                                                   // end-point
     private static String service = "es";
     private static Region region = Region.US_WEST_2;
 
@@ -34,14 +38,14 @@ public class RESTClientTest {
 
         try {
             RequestOptions.Builder requestOptions = RequestOptions.DEFAULT.toBuilder();
-            //  CASE 1: create index
+            // CASE 1: create index
             CreateIndexRequest createIndexRequest = new CreateIndexRequest("custom-index");
 
-            createIndexRequest.settings(Settings.builder() //Specify in the settings how many shards you want in the index.
+            createIndexRequest.settings(Settings.builder() // Specify in the settings how many shards you want in the
+                                                           // index.
                     .put("index.number_of_shards", 2)
-                    .put("index.number_of_replicas", 1)
-            );
-            //Create a set of maps for the index's mappings.
+                    .put("index.number_of_replicas", 1));
+            // Create a set of maps for the index's mappings.
             HashMap<String, String> typeMapping = new HashMap<String, String>();
             typeMapping.put("type", "integer");
             HashMap<String, Object> ageMapping = new HashMap<String, Object>();
@@ -50,16 +54,17 @@ public class RESTClientTest {
             mapping.put("properties", ageMapping);
             createIndexRequest.mapping(mapping);
 
-            CreateIndexResponse createIndexResponse = searchClient.indices().create(createIndexRequest, requestOptions.build());
+            CreateIndexResponse createIndexResponse = searchClient.indices().create(createIndexRequest,
+                    requestOptions.build());
             System.out.println(createIndexResponse.toString());
 
             // CASE 2: Adding data to the index.
-            IndexRequest request = new IndexRequest("custom-index"); //Add a document to the custom-index we created.
-            request.id("1"); //Assign an ID to the document.
+            IndexRequest request = new IndexRequest("custom-index"); // Add a document to the custom-index we created.
+            request.id("1"); // Assign an ID to the document.
 
             HashMap<String, String> stringMapping = new HashMap<String, String>();
             stringMapping.put("message:", "Testing Java REST client");
-            request.source(stringMapping); //Place your content into the index's source.
+            request.source(stringMapping); // Place your content into the index's source.
 
             IndexResponse indexResponse = searchClient.index(request, RequestOptions.DEFAULT);
             System.out.println(indexResponse.toString());
@@ -72,15 +77,17 @@ public class RESTClientTest {
             System.out.println(response.getSourceAsString());
 
             // CASE 4: Delete the document
-            DeleteRequest deleteDocumentRequest = new DeleteRequest("custom-index", "1"); //Index name followed by the ID.
+            DeleteRequest deleteDocumentRequest = new DeleteRequest("custom-index", "1"); // Index name followed by the
+                                                                                          // ID.
 
             DeleteResponse deleteResponse = searchClient.delete(deleteDocumentRequest, RequestOptions.DEFAULT);
             System.out.println(deleteResponse.toString());
 
             // CASE 5: Delete the index
-            DeleteIndexRequest deleteIndexRequest = new DeleteIndexRequest("custom-index"); //Index name.
+            DeleteIndexRequest deleteIndexRequest = new DeleteIndexRequest("custom-index"); // Index name.
 
-            AcknowledgedResponse deleteIndexResponse = searchClient.indices().delete(deleteIndexRequest, RequestOptions.DEFAULT);
+            AcknowledgedResponse deleteIndexResponse = searchClient.indices().delete(deleteIndexRequest,
+                    RequestOptions.DEFAULT);
             System.out.println(deleteIndexResponse.toString());
 
             searchClient.close();
@@ -94,11 +101,16 @@ public class RESTClientTest {
 
     // Adds the interceptor to the OpenSearch REST client
     public static RestHighLevelClient searchClient(String service, Region region) {
-        HttpRequestInterceptor interceptor = new AWSRequestSigningApacheInterceptor(service, region);
+        HttpRequestInterceptor interceptor = new AwsRequestSigningApacheInterceptor(
+                service,
+                Aws4Signer.create(),
+                DefaultCredentialsProvider.create(),
+                region);
 
-        RestHighLevelClient restHighLevelClient = new RestHighLevelClient(RestClient.builder(HttpHost.create(host))
-                .setHttpClientConfigCallback(hacb -> hacb.addInterceptorLast(interceptor))
-                .setCompressionEnabled(true));
+        RestHighLevelClient restHighLevelClient = new RestHighLevelClient(
+                RestClient.builder(HttpHost.create(host))
+                        .setHttpClientConfigCallback(hacb -> hacb.addInterceptorLast(interceptor))                        
+                        .setCompressionEnabled(false));
 
         return restHighLevelClient;
     }
