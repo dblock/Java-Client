@@ -109,7 +109,8 @@ public class RESTClientTest {
         RestHighLevelClient restHighLevelClient = new RestHighLevelClient(
                 RestClient.builder(HttpHost.create(host))
                         .setHttpClientConfigCallback(hacb -> hacb.addInterceptorLast(interceptor))
-                        .setCompressionEnabled(false));
+                        .setCompressionEnabled(true)
+                        .setChunkedEnabled(false));
 
         return restHighLevelClient;
     }
