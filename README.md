@@ -2,7 +2,11 @@
 
 Workaround to https://github.com/opensearch-project/OpenSearch/issues/3640 of setting `.setChunkedEnabled(false)`.
 
-1. Optionally, build [1.x](https://github.com/opensearch-project/OpenSearch/tree/1.x), which had [#3884](https://github.com/opensearch-project/OpenSearch/pull/3884) merged.
+## Building
+
+### OpenSearch 1.x
+
+Optionally, build [1.x](https://github.com/opensearch-project/OpenSearch/tree/1.x), which had [#3884](https://github.com/opensearch-project/OpenSearch/pull/3884) merged.
 
 ```
 git clone git@github.com:opensearch-project/OpenSearch.git
@@ -11,15 +15,21 @@ git checkout 1.x
 ./gradlew :client:rest-high-level:shadowJar
 ```
 
-This produces `./client/rest-high-level/build/distributions/opensearch-rest-high-level-client-1.4.0-SNAPSHOT.jar`.
+This produces `./client/rest-high-level/build/distributions/opensearch-rest-high-level-client-1.4.0-SNAPSHOT.jar`, place it into [src/main/resources](src/main/resources).
 
-2. Install custom-built JAR.
+## Running
+
+### Install Custom JAR
+
+Install custom-built JAR.
 
 ```
 mvn install:install-file -Dfile=src/main/resources/opensearch-rest-high-level-client-1.4.0-SNAPSHOT.jar -DgroupId=org.opensearch.client -DartifactId=opensearch-rest-high-level-client -Dversion=1.4.0-SNAPSHOT -Dpackaging=jar -DgeneratePom=true
 ```
 
-3. Create openSearch domain in (AWS) which support IAM based AuthN/AuthZ.
+### Build and Run Sample
+
+Create an OpenSearch domain in (AWS) which support IAM based AuthN/AuthZ.
 
 Update the value of `host` and `region` in [RESTClientTest.java](/src/main/java/RESTClientTest.java#L27) to your endpoint.
 
@@ -33,3 +43,11 @@ mvn compile exec:java -Dexec.mainClass="RESTClientTest"
 ```
 
 The code will create an index, add a document, then cleanup.
+
+## License 
+
+This project is licensed under the [Apache v2.0 License](LICENSE.txt).
+
+## Copyright
+
+Copyright OpenSearch Contributors. See [NOTICE](NOTICE.txt) for details.
