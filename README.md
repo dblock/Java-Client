@@ -2,12 +2,12 @@
 
 Workaround to https://github.com/opensearch-project/OpenSearch/issues/3640 of setting `.setChunkedEnabled(false)`.
 
-1. Optionally, build https://github.com/opensearch-project/OpenSearch/pull/3884.
+1. Optionally, build [1.x](https://github.com/opensearch-project/OpenSearch/tree/1.x), which had [#3884](https://github.com/opensearch-project/OpenSearch/pull/3884) merged.
 
 ```
 git clone git@github.com:opensearch-project/OpenSearch.git
 cd OpenSearch
-git checkout backport/backport-3864-to-1.x
+git checkout 1.x
 ./gradlew :client:rest-high-level:shadowJar
 ```
 
