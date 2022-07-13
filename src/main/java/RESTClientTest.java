@@ -18,8 +18,7 @@ import org.opensearch.client.indices.CreateIndexRequest;
 import org.opensearch.client.indices.CreateIndexResponse;
 import org.opensearch.common.settings.Settings;
 
-import com.amazonaws.http.AwsRequestSigningApacheInterceptor;
-
+import io.github.acm19.aws.interceptor.http.AwsRequestSigningApacheInterceptor;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.auth.signer.Aws4Signer;
 import software.amazon.awssdk.regions.Region;
@@ -109,7 +108,7 @@ public class RESTClientTest {
 
         RestHighLevelClient restHighLevelClient = new RestHighLevelClient(
                 RestClient.builder(HttpHost.create(host))
-                        .setHttpClientConfigCallback(hacb -> hacb.addInterceptorLast(interceptor))                        
+                        .setHttpClientConfigCallback(hacb -> hacb.addInterceptorLast(interceptor))
                         .setCompressionEnabled(false));
 
         return restHighLevelClient;
