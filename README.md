@@ -1,21 +1,37 @@
 # Java-Client
 
-Makes requests to Amazon OpenSearch using the OpenSearch High Level REST Client. Includes a workaround to [OpenSearch#3640](https://github.com/opensearch-project/OpenSearch/issues/3640), in which a GZIP-compressed request automatically turns on chunked transfer encoding causing SigV4 requests to fail. A feature has been added in [#3884](https://github.com/opensearch-project/OpenSearch/pull/3884) to enable the user to call `.setChunkedEnabled(false)` as a workaround.
+Makes requests to Amazon OpenSearch using the OpenSearch Java Client with native AWS SDK 2.0 transport support [added in opensarch-java 2.1.0](https://github.com/opensearch-project/opensearch-java/pull/177).
 
 ## Building
 
-### OpenSearch 1.x
+### opensearch-java
 
-This code includes a custom-built [opensearch-rest-high-level-client-1.4.0-SNAPSHOT.jar](src/main/resources/opensearch-rest-high-level-client-1.4.0-SNAPSHOT.jar). To build it, check out [OpenSearch#1.x](https://github.com/opensearch-project/OpenSearch/tree/1.x), which had [#3884](https://github.com/opensearch-project/OpenSearch/pull/3884) merged.
+This code includes a custom-built [java-client-2.0.0-SNAPSHOT.jar](src/main/resources/java-client-2.0.0-SNAPSHOT.jar). To build it, check out [opensearch-java#main](https://github.com/opensearch-project/opensearch-java), any revision newer than [opensearch-java#177](https://github.com/opensearch-project/opensearch-java/pull/177).
 
 ```
-git clone git@github.com:opensearch-project/OpenSearch.git
-cd OpenSearch
-git checkout 1.x
-./gradlew :client:rest-high-level:shadowJar
+git clone git@github.com:opensearch-project/opensearch-java.git
+cd opensearch-java
 ```
 
-Copy `./client/rest-high-level/build/distributions/opensearch-rest-high-level-client-1.4.0-SNAPSHOT.jar` into [src/main/resources](src/main/resources).
+Add shadow plugin to `build.gradle`.
+
+```
+plugins {
+  id("com.github.johnrengelman.shadow") version "7.1.2"
+}
+```
+
+```
+apply(plugin = "com.github.johnrengelman.shadow")
+```
+
+Build shadow JAR.
+
+```
+./gradlew shadowJar
+```
+
+Copy `./java-client/build/libs/java-client-2.0.0-SNAPSHOT-all.jar` into [src/main/resources](src/main/resources).
 
 ## Running
 
@@ -24,7 +40,7 @@ Copy `./client/rest-high-level/build/distributions/opensearch-rest-high-level-cl
 Install custom-built JAR into local Maven cache.
 
 ```
-mvn install:install-file -Dfile=src/main/resources/opensearch-rest-high-level-client-1.4.0-SNAPSHOT.jar -DgroupId=org.opensearch.client -DartifactId=opensearch-rest-high-level-client -Dversion=1.4.0-SNAPSHOT -Dpackaging=jar -DgeneratePom=true
+mvn install:install-file -Dfile=src/main/resources/java-client-2.0.0-SNAPSHOT-all.jar -DgroupId=org.opensearch.client -DartifactId=opensearch-java -Dversion=2.1.0-SNAPSHOT -Dpackaging=jar -DgeneratePom=true
 ```
 
 ### Build and Run Sample
