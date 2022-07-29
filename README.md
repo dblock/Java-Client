@@ -6,42 +6,9 @@ Makes requests to Amazon OpenSearch using the OpenSearch Java Client with native
 
 ### opensearch-java
 
-This code includes a custom-built [java-client-2.0.0-SNAPSHOT.jar](src/main/resources/java-client-2.0.0-SNAPSHOT.jar). To build it, check out [opensearch-java#main](https://github.com/opensearch-project/opensearch-java), any revision newer than [opensearch-java#177](https://github.com/opensearch-project/opensearch-java/pull/177).
-
-```
-git clone git@github.com:opensearch-project/opensearch-java.git
-cd opensearch-java
-```
-
-Add shadow plugin to `build.gradle`.
-
-```
-plugins {
-  id("com.github.johnrengelman.shadow") version "7.1.2"
-}
-```
-
-```
-apply(plugin = "com.github.johnrengelman.shadow")
-```
-
-Build shadow JAR.
-
-```
-./gradlew shadowJar
-```
-
-Copy `./java-client/build/libs/java-client-2.0.0-SNAPSHOT-all.jar` into [src/main/resources](src/main/resources).
+This code uses opensearch-java 2.1.0-SNAPSHOT that includes [opensearch-java#177](https://github.com/opensearch-project/opensearch-java/pull/177).
 
 ## Running
-
-### Install Custom JAR
-
-Install custom-built JAR into local Maven cache.
-
-```
-mvn install:install-file -Dfile=src/main/resources/java-client-2.0.0-SNAPSHOT-all.jar -DgroupId=org.opensearch.client -DartifactId=opensearch-java -Dversion=2.1.0-SNAPSHOT -Dpackaging=jar -DgeneratePom=true
-```
 
 ### Build and Run Sample
 
