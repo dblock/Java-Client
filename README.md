@@ -1,16 +1,10 @@
-# Java-Client
+# OpenSearch Java Client Demo
 
-Makes requests to Amazon OpenSearch using the OpenSearch Java Client with native AWS SDK 2.0 transport support [added in opensarch-java 2.1.0](https://github.com/opensearch-project/opensearch-java/pull/177).
+Makes requests to Amazon OpenSearch using the OpenSearch Java Client with native AWS SDK 2.0 transport support [added in opensarch-java 2.1.0](https://github.com/opensearch-project/opensearch-java/pull/177). 
 
-## Building
-
-### opensearch-java
-
-This code uses opensearch-java 2.1.0-SNAPSHOT that includes [opensearch-java#177](https://github.com/opensearch-project/opensearch-java/pull/177).
+For support with older versions and for using OpenSearch High Level REST Client directly, see [opensearch-1.x](https://github.com/dblock/opensearch-java-client-demo/tree/opensearch-1.x) or [opensearch-2.x](https://github.com/dblock/opensearch-java-client-demo/tree/opensearch-2.x).
 
 ## Running
-
-### Build and Run Sample
 
 Create an OpenSearch domain in (AWS) which support IAM based AuthN/AuthZ.
 
