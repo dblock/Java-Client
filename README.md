@@ -1,6 +1,6 @@
 # Java-Client
 
-Makes requests to Amazon OpenSearch using the OpenSearch High Level REST Client. Includes a workaround to [OpenSearch#3640](https://github.com/opensearch-project/OpenSearch/issues/3640), in which a GZIP-compressed request automatically turns on chunked transfer encoding causing SigV4 requests to fail. A feature has been added in [#3884](https://github.com/opensearch-project/OpenSearch/pull/3884) to enable the user to call `.setChunkedEnabled(false)` as a workaround.
+Makes requests to Amazon OpenSearch using the OpenSearch 1.x High Level REST Client. Includes a workaround to [OpenSearch#3640](https://github.com/opensearch-project/OpenSearch/issues/3640), in which a GZIP-compressed request automatically turns on chunked transfer encoding causing SigV4 requests to fail. A feature has been added in [#3884](https://github.com/opensearch-project/OpenSearch/pull/3884) to enable the user to call `.setChunkedEnabled(false)` as a workaround.
 
 ## Building
 
