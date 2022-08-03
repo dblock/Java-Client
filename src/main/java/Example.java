@@ -4,6 +4,7 @@ import org.apache.commons.cli.ParseException;
 import org.apache.http.HttpHost;
 import org.opensearch.client.opensearch.OpenSearchClient;
 import org.opensearch.client.opensearch.core.IndexRequest;
+import org.opensearch.client.opensearch.core.InfoResponse;
 import org.opensearch.client.opensearch.core.SearchResponse;
 import org.opensearch.client.opensearch.indices.CreateIndexRequest;
 import org.opensearch.client.opensearch.indices.DeleteIndexRequest;
@@ -21,18 +22,19 @@ public class Example {
 
     public static void main(final String[] args) throws IOException, ParseException {
         Logger logger = LoggerFactory.getLogger(Example.class);
-        CommandLineArgs opts = new CommandLineArgs("es", args);
+        CommandLineArgs opts = new CommandLineArgs(args);
         SdkHttpClient httpClient = ApacheHttpClient.builder().build();
 
         try {
-            AwsSdk2TransportOptions transportOptions = AwsSdk2TransportOptions.builder().build();
-            AwsSdk2Transport transport = new AwsSdk2Transport(
-                httpClient,
-                HttpHost.create(opts.endpoint).getHostName(),
-                opts.region,
-                transportOptions
-            );
-            OpenSearchClient client = new OpenSearchClient(transport);
+            OpenSearchClient client = new OpenSearchClient(
+                    new AwsSdk2Transport(
+                            httpClient,
+                            HttpHost.create(opts.endpoint).getHostName(),
+                            opts.region,
+                            AwsSdk2TransportOptions.builder().build()));
+
+            InfoResponse info = client.info();
+            logger.info(info.version().distribution() + ": " + info.version().number());
 
             // create the index
             String index = "sample-index";

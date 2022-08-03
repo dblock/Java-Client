@@ -22,17 +22,14 @@ class CommandLineArgs {
     private Logger logger = LoggerFactory.getLogger(CommandLineArgs.class);
     protected String endpoint;
     protected Region region;
-    protected String service;
 
-    CommandLineArgs(final String service, final String[] args) throws ParseException {
-        this.service = service;
+    CommandLineArgs(final String[] args) throws ParseException {
         parseOptions(args);
     }
 
-    CommandLineArgs(final String service, final String endpoint, final Region region) {
+    CommandLineArgs(final String endpoint, final Region region) {
         this.endpoint = endpoint;
         this.region = region;
-        this.service = service;
     }
 
     protected void parseOptions(final String[] args) throws ParseException {
