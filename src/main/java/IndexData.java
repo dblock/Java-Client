@@ -2,6 +2,10 @@ public class IndexData {
     private String firstName;
     private String lastName;
 
+    public IndexData() {
+
+    }
+
     public IndexData(String firstName, String lastName) {
         this.firstName = firstName;
         this.lastName = lastName;

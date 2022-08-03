@@ -20,7 +20,7 @@ import software.amazon.awssdk.http.apache.ApacheHttpClient;
 
 public class Example {
 
-    public static void main(final String[] args) throws IOException, ParseException {
+    public static void main(final String[] args) throws IOException, ParseException, InterruptedException {
         Logger logger = LoggerFactory.getLogger(Example.class);
         CommandLineArgs opts = new CommandLineArgs(args);
         SdkHttpClient httpClient = ApacheHttpClient.builder().build();
@@ -57,6 +57,9 @@ public class Example {
                     .document(indexData)
                     .build();
             client.index(indexRequest);
+
+            // wait for the document to index
+            Thread.sleep(3000);
 
             // search for the document
             SearchResponse<IndexData> searchResponse = client.search(s -> s.index(index), IndexData.class);
