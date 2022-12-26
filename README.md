@@ -12,20 +12,25 @@ Create an OpenSearch domain in (AWS) which support IAM based AuthN/AuthZ.
 export AWS_ACCESS_KEY_ID=
 export AWS_SECRET_ACCESS_KEY=
 export AWS_SESSION_TOKEN=
+export AWS_REGION=us-west-2
 
 export OPENSEARCH_ENDPOINT=https://....us-west-2.es.amazonaws.com
-export OPENSEARCH_REGION=us-west-2
 
 mvn install
 mvn compile exec:java \
   -Dexec.mainClass="Example" \
-  -Dexec.args="--endpoint=$OPENSEARCH_ENDPOINT --region=$OPENSEARCH_REGION" \
+  -Dexec.args="--endpoint=$OPENSEARCH_ENDPOINT --region=$AWS_REGION" \
   -Dlog4j.configurationFile=target/log4j2.xml \
   -Dorg.apache.commons.logging.Log=org.apache.commons.logging.impl.SimpleLog \
-  -Dorg.apache.commons.logging.simplelog.log.org.apache.http.wire=DEBUG
+  -Dorg.apache.commons.logging.simplelog.log.org.apache.http.wire=INFO
 ```
 
-The code will create an index, add a document, then cleanup.
+The [code](src/main/java/Example.java) will show the server version, create an index, add a document, search for it, output the result, then cleanup.
+
+```
+2022-12-26 15:55:02 [Example.main()] INFO  - opensearch: 2.3.0
+2022-12-26 15:55:04 [Example.main()] INFO  - Movie{Director='Bennett Miller', Title='Moneyball', Year=2011}
+```
 
 ## License 
 

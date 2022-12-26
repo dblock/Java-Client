@@ -37,7 +37,7 @@ public class Example {
             logger.info(info.version().distribution() + ": " + info.version().number());
 
             // create the index
-            String index = "sample-index";
+            String index = "movies";
             CreateIndexRequest createIndexRequest = new CreateIndexRequest.Builder().index(index).build();
             client.indices().create(createIndexRequest);
 
@@ -50,19 +50,19 @@ public class Example {
             client.indices().putSettings(putSettingsRequest);
 
             // index data
-            IndexData indexData = new IndexData("first_name", "Bruce");
-            IndexRequest<IndexData> indexRequest = new IndexRequest.Builder<IndexData>()
+            Movie movie = new Movie("Bennett Miller", "Moneyball", 2011);
+            IndexRequest<Movie> indexRequest = new IndexRequest.Builder<Movie>()
                     .index(index)
                     .id("1")
-                    .document(indexData)
+                    .document(movie)
                     .build();
             client.index(indexRequest);
 
             // wait for the document to index
-            Thread.sleep(3000);
+            Thread.sleep(1000);
 
             // search for the document
-            SearchResponse<IndexData> searchResponse = client.search(s -> s.index(index), IndexData.class);
+            SearchResponse<Movie> searchResponse = client.search(s -> s.index(index), Movie.class);
             for (int i = 0; i < searchResponse.hits().hits().size(); i++) {
                 logger.info(searchResponse.hits().hits().get(i).source().toString());
             }
