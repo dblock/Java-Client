@@ -30,24 +30,25 @@ public class Example {
                     new AwsSdk2Transport(
                             httpClient,
                             HttpHost.create(opts.endpoint).getHostName(),
+                            "aoss",
                             opts.region,
                             AwsSdk2TransportOptions.builder().build()));
 
-            InfoResponse info = client.info();
-            logger.info(info.version().distribution() + ": " + info.version().number());
-
+            // InfoResponse info = client.info();
+            // logger.info(info.version().distribution() + ": " + info.version().number());
+            
             // create the index
             String index = "movies";
             CreateIndexRequest createIndexRequest = new CreateIndexRequest.Builder().index(index).build();
             client.indices().create(createIndexRequest);
 
-            // add settings to the index
-            IndexSettings indexSettings = new IndexSettings.Builder().autoExpandReplicas("0-all").build();
-            PutIndicesSettingsRequest putSettingsRequest = new PutIndicesSettingsRequest.Builder()
-                    .index(index)
-                    .settings(indexSettings)
-                    .build();
-            client.indices().putSettings(putSettingsRequest);
+            // // add settings to the index
+            // IndexSettings indexSettings = new IndexSettings.Builder().autoExpandReplicas("0-all").build();
+            // PutIndicesSettingsRequest putSettingsRequest = new PutIndicesSettingsRequest.Builder()
+            //         .index(index)
+            //         .settings(indexSettings)
+            //         .build();
+            // client.indices().putSettings(putSettingsRequest);
 
             // index data
             Movie movie = new Movie("Bennett Miller", "Moneyball", 2011);
