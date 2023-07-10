@@ -32,6 +32,16 @@ The [code](src/main/java/Example.java) will show the server version, create an i
 2022-12-26 15:55:04 [Example.main()] INFO  - Movie{Director='Bennett Miller', Title='Moneyball', Year=2011}
 ```
 
+A sample that performs a vector (k-nn) search is also available in [src/main/java/Knn.java](src/main/java/Knn.java).
+
+```
+mvn compile exec:java \
+  -Dexec.mainClass="Knn" \
+  -Dlog4j.configurationFile=target/log4j2.xml \
+  -Dorg.apache.commons.logging.Log=org.apache.commons.logging.impl.SimpleLog \
+  -Dorg.apache.commons.logging.simplelog.log.org.apache.http.wire=INFO
+```
+
 ## License 
 
 This project is licensed under the [Apache v2.0 License](LICENSE.txt).
