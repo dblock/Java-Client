@@ -5,8 +5,11 @@ import org.apache.http.HttpHost;
 import org.opensearch.client.opensearch.OpenSearchClient;
 import org.opensearch.client.opensearch._types.OpenSearchException;
 import org.opensearch.client.opensearch.core.IndexRequest;
+import org.opensearch.client.opensearch.core.IndexResponse;
 import org.opensearch.client.opensearch.core.InfoResponse;
 import org.opensearch.client.opensearch.core.SearchResponse;
+import org.opensearch.client.opensearch.core.UpdateRequest;
+import org.opensearch.client.opensearch.core.UpdateResponse;
 import org.opensearch.client.opensearch.indices.CreateIndexRequest;
 import org.opensearch.client.opensearch.indices.DeleteIndexRequest;
 import org.opensearch.client.opensearch.indices.IndexSettings;
@@ -77,7 +80,18 @@ public class Example {
                     .id("1")
                     .document(movie)
                     .build();
-            client.index(indexRequest);
+            IndexResponse indexResponse = client.index(indexRequest);
+            System.out.println(String.format("Document %s.", indexResponse.result().toString().toLowerCase()));
+
+            // update data
+            Movie movieUpdate = new Movie("Bennett Miller", "Moneyball 2", 2011);
+            UpdateRequest<Movie, Movie> updateRequest = new UpdateRequest.Builder<Movie, Movie>()
+                .id("1")
+                .index(index)
+                .doc(movieUpdate)
+                .build();
+            UpdateResponse<Movie> updateResponse = client.update(updateRequest, Movie.class);
+            System.out.println(String.format("Document %s.", updateResponse.result().toString().toLowerCase()));
 
             // wait for the document to index
             Thread.sleep(3000);
