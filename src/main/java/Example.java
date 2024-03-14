@@ -1,106 +1,78 @@
-import java.io.IOException;
-import java.util.HashMap;
-
+import io.github.acm19.aws.interceptor.http.AwsRequestSigningApacheV5Interceptor;
 import org.apache.commons.cli.ParseException;
-import org.apache.http.HttpHost;
-import org.apache.http.HttpRequestInterceptor;
-import org.opensearch.action.admin.indices.delete.DeleteIndexRequest;
-import org.opensearch.action.delete.DeleteRequest;
-import org.opensearch.action.delete.DeleteResponse;
-import org.opensearch.action.get.GetRequest;
-import org.opensearch.action.get.GetResponse;
-import org.opensearch.action.index.IndexRequest;
-import org.opensearch.action.index.IndexResponse;
-import org.opensearch.action.support.master.AcknowledgedResponse;
-import org.opensearch.client.RequestOptions;
-import org.opensearch.client.RestClient;
-import org.opensearch.client.RestHighLevelClient;
-import org.opensearch.client.indices.CreateIndexRequest;
-import org.opensearch.client.indices.CreateIndexResponse;
-import org.opensearch.common.settings.Settings;
+import org.apache.hc.client5.http.config.TlsConfig;
+import org.apache.hc.client5.http.impl.nio.PoolingAsyncClientConnectionManagerBuilder;
+import org.apache.hc.core5.http.HttpHost;
+import org.opensearch.client.opensearch.OpenSearchClient;
+import org.opensearch.client.opensearch._types.mapping.IntegerNumberProperty;
+import org.opensearch.client.opensearch._types.mapping.Property;
+import org.opensearch.client.opensearch._types.mapping.TypeMapping;
+import org.opensearch.client.opensearch.cluster.HealthResponse;
+import org.opensearch.client.opensearch.cluster.OpenSearchClusterClient;
+import org.opensearch.client.opensearch.indices.CreateIndexRequest;
+import org.opensearch.client.opensearch.indices.CreateIndexResponse;
+import org.opensearch.client.opensearch.indices.IndexSettings;
+import org.opensearch.client.transport.OpenSearchTransport;
+import org.opensearch.client.transport.httpclient5.ApacheHttpClient5TransportBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import io.github.acm19.aws.interceptor.http.AwsRequestSigningApacheInterceptor;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.auth.signer.Aws4Signer;
 import software.amazon.awssdk.regions.Region;
 
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+
+import static org.apache.hc.core5.http2.HttpVersionPolicy.FORCE_HTTP_1;
+
 public class Example {
 
-    public static void main(final String[] args) throws IOException, ParseException {
+    public static void main(final String[] args) throws IOException, ParseException, URISyntaxException {
         Logger logger = LoggerFactory.getLogger(Example.class);
         CommandLineArgs opts = new CommandLineArgs("es", args);
-        RestHighLevelClient client = createClient(opts.service, opts.endpoint, opts.region);
+        OpenSearchTransport openSearchTransport = createTransport(opts.service, opts.endpoint, opts.region);
+        OpenSearchClient client = new OpenSearchClient(openSearchTransport);
+        OpenSearchClusterClient clusterClient = new OpenSearchClusterClient(openSearchTransport);
 
         try {
-            RequestOptions.Builder requestOptions = RequestOptions.DEFAULT.toBuilder();
+            // check cluster health (GET request)
+            HealthResponse health = clusterClient.health();
+
+            logger.info("cluster {} status is {}.", health.clusterName(), health.status());
 
             // create index
-            CreateIndexRequest createIndexRequest = new CreateIndexRequest("custom-index");
-            createIndexRequest.settings(
-                    Settings.builder()
-                            .put("index.number_of_shards", 2)
-                            .put("index.number_of_replicas", 1));
+            CreateIndexRequest createIndexRequest = new CreateIndexRequest.Builder()
+                    .index("custom-index")
+                    .settings(
+                            new IndexSettings.Builder()
+                                    .numberOfShards("2")
+                                    .numberOfReplicas("1")
+                                    .build()
+                    )
+                    .mappings(new TypeMapping.Builder()
+                            .properties("age", new Property(new IntegerNumberProperty.Builder().build()))
+                            .build()
+                    )
+                    .build();
+            CreateIndexResponse createIndexResponse = client.indices().create(createIndexRequest);
 
-            // index mappings
-            HashMap<String, String> typeMapping = new HashMap<String, String>();
-            typeMapping.put("type", "integer");
-            HashMap<String, Object> ageMapping = new HashMap<String, Object>();
-            ageMapping.put("age", typeMapping);
-            HashMap<String, Object> mapping = new HashMap<String, Object>();
-            mapping.put("properties", ageMapping);
-            createIndexRequest.mapping(mapping);
-
-            CreateIndexResponse createIndexResponse = client.indices().create(
-                    createIndexRequest, requestOptions.build());
             logger.info(createIndexResponse.toString());
 
             // add a document
-            IndexRequest request = new IndexRequest("custom-index");
-            request.id("1"); // document ID
-
-            HashMap<String, String> stringMapping = new HashMap<String, String>();
-            stringMapping.put("message:", "Testing Java REST client");
-            request.source(stringMapping); // place content into the index's source
-
-            IndexResponse indexResponse = client.index(request, RequestOptions.DEFAULT);
-            logger.info(indexResponse.toString());
-
-            // retrieve the document
-            GetRequest getRequest = new GetRequest("custom-index", "1");
-            GetResponse response = client.get(getRequest, RequestOptions.DEFAULT);
-            logger.info(response.getSourceAsString());
-
-            // delete the document
-            DeleteRequest deleteDocumentRequest = new DeleteRequest("custom-index", "1");
-            DeleteResponse deleteResponse = client.delete(deleteDocumentRequest, RequestOptions.DEFAULT);
-            logger.info(deleteResponse.toString());
-
-            // delete the index
-            DeleteIndexRequest deleteIndexRequest = new DeleteIndexRequest("custom-index");
-            AcknowledgedResponse deleteIndexResponse = client.indices().delete(deleteIndexRequest,
-                    RequestOptions.DEFAULT);
-            logger.info(deleteIndexResponse.toString());
         } finally {
-            client.close();
+            client._transport().close();
         }
     }
 
-    // Adds the interceptor to the OpenSearch REST client
-    public static RestHighLevelClient createClient(String service, String host, Region region) {
-        HttpRequestInterceptor interceptor = new AwsRequestSigningApacheInterceptor(
-                service,
-                Aws4Signer.create(),
-                DefaultCredentialsProvider.create(),
-                region);
-
-        RestHighLevelClient restHighLevelClient = new RestHighLevelClient(
-                RestClient.builder(HttpHost.create(host))
-                        .setHttpClientConfigCallback(hacb -> hacb.addInterceptorLast(interceptor))
-                        .setCompressionEnabled(true)
-                        .setChunkedEnabled(false));
-
-        return restHighLevelClient;
+    public static OpenSearchTransport createTransport(String service, String host, Region region) throws URISyntaxException {
+        return ApacheHttpClient5TransportBuilder.builder(HttpHost.create(new URI(host)))
+                .setHttpClientConfigCallback(clientBuilder -> clientBuilder
+                        .addRequestInterceptorLast(new AwsRequestSigningApacheV5Interceptor(service, Aws4Signer.create(), DefaultCredentialsProvider.create(), region))
+                        .setConnectionManager(PoolingAsyncClientConnectionManagerBuilder.create()
+                                .setDefaultTlsConfig(TlsConfig.custom().setVersionPolicy(FORCE_HTTP_1).build())
+                                .build())
+                )
+                .build();
     }
 }
