@@ -1,33 +1,39 @@
-import java.io.IOException;
-import java.util.Objects;
-
-import org.apache.http.HttpHost;
+import io.github.acm19.aws.interceptor.http.AwsRequestSigningApacheV5Interceptor;
+import org.apache.commons.cli.ParseException;
+import org.apache.hc.client5.http.config.TlsConfig;
+import org.apache.hc.client5.http.impl.nio.PoolingAsyncClientConnectionManagerBuilder;
+import org.apache.hc.core5.http.HttpHost;
 import org.opensearch.client.opensearch.OpenSearchClient;
-import org.opensearch.client.opensearch._types.OpenSearchException;
-import org.opensearch.client.opensearch.core.IndexRequest;
-import org.opensearch.client.opensearch.core.IndexResponse;
-import org.opensearch.client.opensearch.core.InfoResponse;
-import org.opensearch.client.opensearch.core.SearchResponse;
-import org.opensearch.client.opensearch.core.UpdateRequest;
-import org.opensearch.client.opensearch.core.UpdateResponse;
+import org.opensearch.client.opensearch._types.mapping.IntegerNumberProperty;
+import org.opensearch.client.opensearch._types.mapping.Property;
+import org.opensearch.client.opensearch._types.mapping.TypeMapping;
+import org.opensearch.client.opensearch.cluster.HealthResponse;
+import org.opensearch.client.opensearch.cluster.OpenSearchClusterClient;
 import org.opensearch.client.opensearch.indices.CreateIndexRequest;
-import org.opensearch.client.opensearch.indices.DeleteIndexRequest;
+import org.opensearch.client.opensearch.indices.CreateIndexResponse;
 import org.opensearch.client.opensearch.indices.IndexSettings;
-import org.opensearch.client.opensearch.indices.PutIndicesSettingsRequest;
-import org.opensearch.client.transport.aws.AwsSdk2Transport;
-import org.opensearch.client.transport.aws.AwsSdk2TransportOptions;
+import org.opensearch.client.transport.OpenSearchTransport;
+import org.opensearch.client.transport.httpclient5.ApacheHttpClient5TransportBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import software.amazon.awssdk.http.SdkHttpClient;
-import software.amazon.awssdk.http.apache.ApacheHttpClient;
+import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
+import software.amazon.awssdk.auth.signer.Aws4Signer;
 import software.amazon.awssdk.regions.Region;
+
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+
+import static org.apache.hc.core5.http2.HttpVersionPolicy.FORCE_HTTP_1;
 
 public class Example {
 
-    public static void main(final String[] args) throws IOException, InterruptedException {
+    public static void main(final String[] args) throws IOException, ParseException, URISyntaxException {
         Logger logger = LoggerFactory.getLogger(Example.class);
-        SdkHttpClient httpClient = ApacheHttpClient.builder().build();
+        CommandLineArgs opts = new CommandLineArgs("es", args);
+        OpenSearchTransport openSearchTransport = createTransport(opts.service, opts.endpoint, opts.region);
+        OpenSearchClient client = new OpenSearchClient(openSearchTransport);
+        OpenSearchClusterClient clusterClient = new OpenSearchClusterClient(openSearchTransport);
 
         String endpoint = System.getenv("ENDPOINT");
         if (endpoint == null) {
@@ -38,78 +44,43 @@ public class Example {
         String service = System.getenv().getOrDefault("SERVICE", "es");
         
         try {
-            OpenSearchClient client = new OpenSearchClient(
-                    new AwsSdk2Transport(
-                            httpClient,
-                            HttpHost.create(endpoint).getHostName(),
-                            service,
-                            Region.of(region),
-                            AwsSdk2TransportOptions.builder().build()));
+            // check cluster health (GET request)
+            HealthResponse health = clusterClient.health();
 
-            // TODO: remove when Serverless supports GET /
-            if (! service.equals("aoss")) {
-                InfoResponse info = client.info();
-                logger.info(info.version().distribution() + ": " + info.version().number());
-            }
+            logger.info("cluster {} status is {}.", health.clusterName(), health.status());
 
-            // create the index
-            String index = "movies";
-            CreateIndexRequest createIndexRequest = new CreateIndexRequest.Builder().index(index).build();
-
-            try {
-                client.indices().create(createIndexRequest);
-
-                // add settings to the index
-                IndexSettings indexSettings = new IndexSettings.Builder().build();
-                PutIndicesSettingsRequest putSettingsRequest = new PutIndicesSettingsRequest.Builder()
-                        .index(index)
-                        .settings(indexSettings)
-                        .build();
-                client.indices().putSettings(putSettingsRequest);
-            } catch (OpenSearchException ex) {
-                final String errorType = Objects.requireNonNull(ex.response().error().type());
-                if (! errorType.equals("resource_already_exists_exception")) {
-                    throw ex;
-                }
-            }
-
-            // index data
-            Movie movie = new Movie("Bennett Miller", "Moneyball", 2011);
-            IndexRequest<Movie> indexRequest = new IndexRequest.Builder<Movie>()
-                    .index(index)
-                    .id("1")
-                    .document(movie)
+            // create index
+            CreateIndexRequest createIndexRequest = new CreateIndexRequest.Builder()
+                    .index("custom-index")
+                    .settings(
+                            new IndexSettings.Builder()
+                                    .numberOfShards("2")
+                                    .numberOfReplicas("1")
+                                    .build()
+                    )
+                    .mappings(new TypeMapping.Builder()
+                            .properties("age", new Property(new IntegerNumberProperty.Builder().build()))
+                            .build()
+                    )
                     .build();
-            IndexResponse indexResponse = client.index(indexRequest);
-            System.out.println(String.format("Document %s.", indexResponse.result().toString().toLowerCase()));
+            CreateIndexResponse createIndexResponse = client.indices().create(createIndexRequest);
 
-            // update data
-            Movie movieUpdate = new Movie("Bennett Miller", "Moneyball 2", 2011);
-            UpdateRequest<Movie, Movie> updateRequest = new UpdateRequest.Builder<Movie, Movie>()
-                .id("1")
-                .index(index)
-                .doc(movieUpdate)
-                .build();
-            UpdateResponse<Movie> updateResponse = client.update(updateRequest, Movie.class);
-            System.out.println(String.format("Document %s.", updateResponse.result().toString().toLowerCase()));
+            logger.info(createIndexResponse.toString());
 
-            // wait for the document to index
-            Thread.sleep(3000);
-
-            // search for the document
-            SearchResponse<Movie> searchResponse = client.search(s -> s.index(index), Movie.class);
-            for (int i = 0; i < searchResponse.hits().hits().size(); i++) {
-                logger.info(searchResponse.hits().hits().get(i).source().toString());
-            }
-
-            // delete the document
-            client.delete(b -> b.index(index).id("1"));
-
-            // delete the index
-            DeleteIndexRequest deleteRequest = new DeleteIndexRequest.Builder().index(index).build();
-            client.indices().delete(deleteRequest);
+            // add a document
         } finally {
-            httpClient.close();
+            client._transport().close();
         }
+    }
+
+    public static OpenSearchTransport createTransport(String service, String host, Region region) throws URISyntaxException {
+        return ApacheHttpClient5TransportBuilder.builder(HttpHost.create(new URI(host)))
+                .setHttpClientConfigCallback(clientBuilder -> clientBuilder
+                        .addRequestInterceptorLast(new AwsRequestSigningApacheV5Interceptor(service, Aws4Signer.create(), DefaultCredentialsProvider.create(), region))
+                        .setConnectionManager(PoolingAsyncClientConnectionManagerBuilder.create()
+                                .setDefaultTlsConfig(TlsConfig.custom().setVersionPolicy(FORCE_HTTP_1).build())
+                                .build())
+                )
+                .build();
     }
 }
