@@ -42,6 +42,16 @@ mvn compile exec:java \
   -Dorg.apache.commons.logging.simplelog.log.org.apache.http.wire=INFO
 ```
 
+A sample that uses a generic client (raw JSON) is also available in [src/main/java/Generic.java](src/main/java/Generic.java).
+
+```
+mvn compile exec:java \
+  -Dexec.mainClass="Generic" \
+  -Dlog4j.configurationFile=target/log4j2.xml \
+  -Dorg.apache.commons.logging.Log=org.apache.commons.logging.impl.SimpleLog \
+  -Dorg.apache.commons.logging.simplelog.log.org.apache.http.wire=INFO
+```
+
 ## License 
 
 This project is licensed under the [Apache v2.0 License](LICENSE.txt).
