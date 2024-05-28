@@ -52,6 +52,16 @@ mvn compile exec:java \
   -Dorg.apache.commons.logging.simplelog.log.org.apache.http.wire=INFO
 ```
 
+A sample that uses dynamic proxy to intercept calls to `OpenSearchClient` so you can write cross-cutting concerns (such as logging, error handling or custom retry policies, etc.) once is also available in [src/main/java/LoggingClientExample.java](src/main/java/LoggingClientExample.java).
+
+```
+mvn compile exec:java \
+  -Dexec.mainClass="LoggingClientExample" \
+  -Dlog4j.configurationFile=target/log4j2.xml \
+  -Dorg.apache.commons.logging.Log=org.apache.commons.logging.impl.SimpleLog \
+  -Dorg.apache.commons.logging.simplelog.log.org.apache.http.wire=INFO
+```
+
 ## License 
 
 This project is licensed under the [Apache v2.0 License](LICENSE.txt).
